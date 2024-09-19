@@ -1,23 +1,35 @@
 # Define the compiler and flags
 NVCC = nvcc
-CXXFLAGS = -std=c++11 -O2
-TARGET = layout_transform
+CXXFLAGS = -std=c++14 -O2 -arch=sm_90a
+INCLUDES = -I.
 
-# Files
-SRC = test_layout_transform_general.cu
-OBJ = test_layout_transform.o
+# Targets
+TARGETS = test_wgmma test_layout_transform_general
+
+# Source files
+WGMMA_SRC = midwit-matmul/wgmma_kernel.cu
+TRANSFORM_HEADER = layout_transform.cuh
+
+# Object files
+WGMMA_OBJ = wgmma_kernel.o
 
 # Default rule
-all: $(TARGET)
+all: $(TARGETS)
 
-# Compile the CUDA source file to an object file
-$(OBJ): $(SRC)
-	$(NVCC) $(CXXFLAGS) -c $(SRC) -o $(OBJ)
+# Rule for test_wgmma
+test_wgmma: test_wgmma.cu $(WGMMA_OBJ) $(TRANSFORM_HEADER)
+	$(NVCC) $(CXXFLAGS) $(INCLUDES) $< $(WGMMA_OBJ) -o $@
 
-# Link the object file to create the executable
-$(TARGET): $(OBJ)
-	$(NVCC) $(OBJ) -o $(TARGET)
+# Rule for test_layout_transform_general
+test_layout_transform_general: test_layout_transform_general.cu $(TRANSFORM_HEADER)
+	$(NVCC) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+# Compile the WGMMA kernel source file to an object file
+$(WGMMA_OBJ): $(WGMMA_SRC)
+	$(NVCC) $(CXXFLAGS) -c $< -o $@
 
 # Clean up the build files
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f $(TARGETS) $(WGMMA_OBJ)
+
+.PHONY: all clean
