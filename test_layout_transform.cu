@@ -6,13 +6,13 @@
 
 // (m, k) -> (m // TILE_DIM, k // TILE_DIM, m % TILE_DIM, k % TILE_DIM)
 __global__ void layout_transform_8x8(float* x, float* out, int m, int k) {
-    int output_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int input_idx = blockIdx.x * blockDim.x + threadIdx.x;
     int total_elements = m * k;
 
-    if (output_idx >= total_elements) return; // Boundary check
+    if (input_idx >= total_elements) return; // Boundary check
 
-    int m_idx = output_idx / k;
-    int k_idx = output_idx % k;
+    int m_idx = input_idx / k;
+    int k_idx = input_idx % k;
 
     // int num_tiles_m = m / TILE_DIM;
     int num_tiles_k = k / TILE_DIM;
@@ -20,7 +20,7 @@ __global__ void layout_transform_8x8(float* x, float* out, int m, int k) {
     int m_tile_idx = m_idx % TILE_DIM;
     int k_tile_id = k_idx / TILE_DIM;
     int k_tile_idx = k_idx % TILE_DIM;
-    int input_idx = k_tile_idx + TILE_DIM*m_tile_idx + TILE_DIM*TILE_DIM*k_tile_id + num_tiles_k*TILE_DIM*TILE_DIM*m_tile_id;
+    int output_idx = k_tile_idx + TILE_DIM*m_tile_idx + TILE_DIM*TILE_DIM*k_tile_id + num_tiles_k*TILE_DIM*TILE_DIM*m_tile_id;
     out[output_idx] = x[input_idx];
 }
 
