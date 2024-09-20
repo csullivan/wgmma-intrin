@@ -2,14 +2,15 @@
 
 int main() {
     int m = 16;
-    int k = 16; 
+    int k = 256; 
     int size = m * k;
 
     // Define rank and shapes
+    int tile_size = 8;
     int rank = 4;
-    int32_t h_input_shape[MAX_RANK] = { m / 8, 8, k / 8, 8 };
-    int32_t h_axes_order[MAX_RANK] = { 0, 2, 1, 3 };
-    // int32_t h_axes_order[MAX_RANK] = { 2, 0, 3, 1 };
+    int32_t h_input_shape[MAX_RANK] = { m / tile_size, tile_size, k / tile_size, tile_size };
+    // int32_t h_axes_order[MAX_RANK] = { 0, 2, 1, 3 };
+    int32_t h_axes_order[MAX_RANK] = { 2, 0, 3, 1 };
 
     float* h_in = (float*)malloc(size * sizeof(float));
     float* h_out_scatter = (float*)malloc(size * sizeof(float));
@@ -37,16 +38,16 @@ int main() {
 
     // Print results
     printf("Scatter Transform Output:\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < k; j++) {
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
             printf("%.0f ", h_out_scatter[i * k + j]);
         }
         printf("\n");
     }
 
     printf("\nGather Transform Output:\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < k; j++) {
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
             printf("%.0f ", h_out_gather[i * k + j]);
         }
         printf("\n");

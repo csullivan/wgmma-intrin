@@ -4,7 +4,8 @@
 #define MAX_RANK 8
 
 // Scatter version: Threads map over the input array
-__global__ void layout_transform_scatter(float* input, float* output, int total_elements, int rank, int32_t* input_strides, int32_t* output_strides, int32_t* axes_order) {
+template <typename T>
+__global__ void layout_transform_scatter(const T* input, T* output, int total_elements, int rank, const int32_t* input_strides, const int32_t* output_strides, const int32_t* axes_order) {
     int input_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (input_idx >= total_elements) return;
 
@@ -34,7 +35,8 @@ __global__ void layout_transform_scatter(float* input, float* output, int total_
 }
 
 // Gather version: Threads map over the output array
-__global__ void layout_transform_gather(float* input, float* output, int total_elements, int rank, int32_t* input_strides, int32_t* output_strides, int32_t* axes_order_inv) {
+template <typename T>
+__global__ void layout_transform_gather(const T* input, T* output, int total_elements, int rank, int32_t* input_strides, int32_t* output_strides, int32_t* axes_order_inv) {
     int output_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (output_idx >= total_elements) return;
 
@@ -63,7 +65,8 @@ __global__ void layout_transform_gather(float* input, float* output, int total_e
     output[output_idx] = input[input_idx];
 }
 
-void launch_transform(float* d_in, float* d_out, int32_t* h_input_shape, int32_t* h_axes_order, int rank, bool scatter) {
+template<typename T>
+void launch_transform(const T* d_in, T* d_out, int32_t* h_input_shape, int32_t* h_axes_order, int rank, bool scatter) {
     int total_elements = 1;
     for (int i = 0; i < rank; i++) {
         total_elements *= h_input_shape[i];
