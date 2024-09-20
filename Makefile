@@ -14,7 +14,7 @@ TRANSFORM_HEADER = layout_transform.cuh
 all: $(TARGETS)
 
 # Rule for test_wgmma
-test_wgmma: test_wgmma.cu $(WGMMA_HEADER) $(TRANSFORM_HEADER)
+test_wgmma: test_single_instance_wgmma.cu $(WGMMA_HEADER) $(TRANSFORM_HEADER)
 	$(NVCC) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 # Rule for test_layout_transform_general
