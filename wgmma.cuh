@@ -1,9 +1,9 @@
-#include <cuda_bf16.h>
+#include <cuda_fp16.h>
 
 #include <cassert>
 #include <cstdint>
 
-__device__ void ptx_wgmma_bf16_m64n256k16(float r[128], uint64_t desc_a, uint64_t desc_b) {
+__device__ void ptx_wgmma_f16_m64n256k16(float r[128], uint64_t desc_a, uint64_t desc_b) {
   int scale_d = false;
   int imm_scale_a = 1;
   int imm_scale_b = 1;
@@ -12,7 +12,7 @@ __device__ void ptx_wgmma_bf16_m64n256k16(float r[128], uint64_t desc_a, uint64_
   asm volatile(
       ".reg .pred %%p;\n\t"
       "setp.eq.s32 %%p, %130, 1;\n\t"
-      "wgmma.mma_async.sync.aligned.m64n256k16.f32.bf16.bf16 "
+      "wgmma.mma_async.sync.aligned.m64n256k16.f32.f16.f16 "
       "{"
       "%0, %1, %2, %3, %4, %5, %6, %7, "
       "%8, %9, %10, %11, %12, %13, %14, %15, "
@@ -83,11 +83,11 @@ __device__ uint64_t descriptor(
       ((stride_offset >> 4) << 32) | (base_offset << 49) | (swizzle << 62);
 }
 
-__global__ void wgmma_bf16_m64n256k16_kernel(__nv_bfloat16* a, __nv_bfloat16* b, __nv_bfloat16* c) {
+__global__ void wgmma_f16_m64n256k16_kernel(__nv_half* a, __nv_half* b, __nv_half* c) {
   constexpr int a_size = 64 * 16;
   constexpr int b_size = 256 * 16;
-  __shared__ __nv_bfloat16 a_shared[64 * 16];
-  __shared__ __nv_bfloat16 b_shared[256 * 16];
+  __shared__ __nv_half a_shared[64 * 16];
+  __shared__ __nv_half b_shared[256 * 16];
 
   auto tid = threadIdx.x;
   auto bdim = blockDim.x;
@@ -104,7 +104,7 @@ __global__ void wgmma_bf16_m64n256k16_kernel(__nv_bfloat16* a, __nv_bfloat16* b,
   }
 
   float c_regs[128] = {0.0f};
-  ptx_wgmma_bf16_m64n256k16(
+  ptx_wgmma_f16_m64n256k16(
       c_regs,
       descriptor((uint64_t)a_shared, 128, 256, 0, 0),
       descriptor((uint64_t)b_shared, 128, 128 * 16 / 8, 0, 0));
@@ -113,11 +113,11 @@ __global__ void wgmma_bf16_m64n256k16_kernel(__nv_bfloat16* a, __nv_bfloat16* b,
   ptx_wgmma_wait_group();
 
   for (int i = 0; i < 128; i++) {
-    c[tid * bdim + i] = __float2bfloat16(c_regs[i]);
+    c[tid * bdim + i] = __float2half(c_regs[i]);
   }
 }
 
-void wgmma_bf16_m64n256k16(void* a, void* b, void* c, int m, int n, int k) {
+void wgmma_f16_m64n256k16(void* a, void* b, void* c, int m, int n, int k) {
   if (m != 64 || n != 256 || k != 16) {
     printf("Error: Current implementation only supports m=64, n=256, k=16\n");
     printf("Received: m=%d, n=%d, k=%d\n", m, n, k);
@@ -126,8 +126,8 @@ void wgmma_bf16_m64n256k16(void* a, void* b, void* c, int m, int n, int k) {
   
   // TODO(csullivan): Implement outer loops to support larger matrix sizes
 
-  wgmma_bf16_m64n256k16_kernel<<<1, 128>>>(
-      static_cast<__nv_bfloat16*>(a),
-      static_cast<__nv_bfloat16*>(b),
-      static_cast<__nv_bfloat16*>(c));
+  wgmma_f16_m64n256k16_kernel<<<1, 128>>>(
+      static_cast<__nv_half*>(a),
+      static_cast<__nv_half*>(b),
+      static_cast<__nv_half*>(c));
 }

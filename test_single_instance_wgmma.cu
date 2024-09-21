@@ -1,5 +1,5 @@
 #include <cuda_runtime.h>
-#include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #include <iostream>
 #include <vector>
 #include <random>
@@ -9,8 +9,8 @@
 #include "layout_transform.cuh"
 #include "wgmma.cuh"
 
-__nv_bfloat16 float_to_bf16(float f) {
-    return __float2bfloat16(f);
+__nv_half float_to_f16(float f) {
+    return __float2half(f);
 }
 
 bool is_close(float a, float b, float rtol = 1e-5, float atol = 1e-8) {
@@ -23,9 +23,9 @@ int main() {
     const int size_b = k * n;
     const int size_c = m * n;
 
-    std::vector<__nv_bfloat16> h_a(size_a);
-    std::vector<__nv_bfloat16> h_b(size_b);
-    std::vector<__nv_bfloat16> h_c(size_c);
+    std::vector<__nv_half> h_a(size_a);
+    std::vector<__nv_half> h_b(size_b);
+    std::vector<__nv_half> h_c(size_c);
 
     // std::random_device rd;
     // std::mt19937 gen(rd());
@@ -34,9 +34,9 @@ int main() {
         for (int j = 0; j < k; ++j) {
             if (i < 8 && j < 8) {
                 float value = (i * 8 + j); 
-                h_a[i * k + j] = float_to_bf16(value);
+                h_a[i * k + j] = float_to_f16(value);
             } else {
-                h_a[i * k + j] = float_to_bf16(0.0f);
+                h_a[i * k + j] = float_to_f16(0.0f);
             }
         }
     }
@@ -44,24 +44,24 @@ int main() {
         for (int j = 0; j < n; ++j) {
             if (i < 8 && j < 8) {
                 float value = j * 8 + i;
-                h_b[i * n + j] = float_to_bf16(value);
+                h_b[i * n + j] = float_to_f16(value);
             } else {
-                h_b[i * n + j] = float_to_bf16(0.0f);
+                h_b[i * n + j] = float_to_f16(0.0f);
             }
         }
     }
 
-    __nv_bfloat16 *d_a, *d_b, *d_c;
-    cudaMalloc(&d_a, size_a * sizeof(__nv_bfloat16));
-    cudaMalloc(&d_b, size_b * sizeof(__nv_bfloat16));
-    cudaMalloc(&d_c, size_c * sizeof(__nv_bfloat16));
+    __nv_half *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size_a * sizeof(__nv_half));
+    cudaMalloc(&d_b, size_b * sizeof(__nv_half));
+    cudaMalloc(&d_c, size_c * sizeof(__nv_half));
 
-    cudaMemcpy(d_a, h_a.data(), size_a * sizeof(__nv_bfloat16), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b.data(), size_b * sizeof(__nv_bfloat16), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_a, h_a.data(), size_a * sizeof(__nv_half), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b.data(), size_b * sizeof(__nv_half), cudaMemcpyHostToDevice);
 
-    __nv_bfloat16 *d_a_transformed, *d_b_transformed;
-    cudaMalloc(&d_a_transformed, size_a * sizeof(__nv_bfloat16));
-    cudaMalloc(&d_b_transformed, size_b * sizeof(__nv_bfloat16));
+    __nv_half *d_a_transformed, *d_b_transformed;
+    cudaMalloc(&d_a_transformed, size_a * sizeof(__nv_half));
+    cudaMalloc(&d_b_transformed, size_b * sizeof(__nv_half));
 
     // (m, k) -> (m//8, k//8, m%8, k%8)
     int32_t h_a_shape[4] = {m / 8, 8, k / 8, 8};
@@ -86,26 +86,26 @@ int main() {
     int32_t h_c_axes_order[6] = {0, 4, 1, 3, 2, 5};
 
     // Perform layout transforms for inputs
-    launch_transform((__nv_bfloat16*)d_a, (__nv_bfloat16*)d_a_transformed, h_a_shape, h_a_axes_order, 4, true);
-    launch_transform((__nv_bfloat16*)d_b, (__nv_bfloat16*)d_b_transformed, h_b_shape, h_b_axes_order, 4, true);
+    launch_transform((__nv_half*)d_a, (__nv_half*)d_a_transformed, h_a_shape, h_a_axes_order, 4, true);
+    launch_transform((__nv_half*)d_b, (__nv_half*)d_b_transformed, h_b_shape, h_b_axes_order, 4, true);
 
-    std::vector<__nv_bfloat16> h_a_transformed(size_a);
-    std::vector<__nv_bfloat16> h_b_transformed(size_b);
+    std::vector<__nv_half> h_a_transformed(size_a);
+    std::vector<__nv_half> h_b_transformed(size_b);
 
-    cudaMemcpy(h_a_transformed.data(), d_a_transformed, size_a * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_b_transformed.data(), d_b_transformed, size_b * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_a_transformed.data(), d_a_transformed, size_a * sizeof(__nv_half), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_b_transformed.data(), d_b_transformed, size_b * sizeof(__nv_half), cudaMemcpyDeviceToHost);
 
     std::cout << "\nTop right corner of original A (16x16):" << std::endl;    
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
-            std::cout << __bfloat162float(h_a[i * k + j]) << " ";
+            std::cout << __half2float(h_a[i * k + j]) << " ";
         }
         std::cout << std::endl;
     }
     std::cout << "\nTop right corner of transformed A (16x16):" << std::endl;    
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
-            std::cout << __bfloat162float(h_a_transformed[i * k + j]) << " ";
+            std::cout << __half2float(h_a_transformed[i * k + j]) << " ";
         }
         std::cout << std::endl;
     }
@@ -113,46 +113,46 @@ int main() {
     std::cout << "\nTop right corner of original B (16x16):" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
-            std::cout << __bfloat162float(h_b[i * n + j]) << " ";
+            std::cout << __half2float(h_b[i * n + j]) << " ";
         }
         std::cout << std::endl;
     }
     std::cout << "\nTop right corner of transformed B (1x66):" << std::endl;
     for (int i = 0; i < 1; ++i) {
         for (int j = 0; j < 66; ++j) {
-            std::cout << __bfloat162float(h_b_transformed[i * n + j]) << " ";
+            std::cout << __half2float(h_b_transformed[i * n + j]) << " ";
         }
         std::cout << std::endl;
     }
 
-    std::vector<__nv_bfloat16> h_c_naive(size_c);
-    __nv_bfloat16 *d_c_naive;
-    cudaMalloc(&d_c_naive, size_c * sizeof(__nv_bfloat16));
+    std::vector<__nv_half> h_c_naive(size_c);
+    __nv_half *d_c_naive;
+    cudaMalloc(&d_c_naive, size_c * sizeof(__nv_half));
 
-    wgmma_bf16_m64n256k16(d_a_transformed, d_b_transformed, d_c, m, n, k);
+    wgmma_f16_m64n256k16(d_a_transformed, d_b_transformed, d_c, m, n, k);
 
-    __nv_bfloat16 *d_c_transformed;
-    cudaMalloc(&d_c_transformed, size_c * sizeof(__nv_bfloat16));
+    __nv_half *d_c_transformed;
+    cudaMalloc(&d_c_transformed, size_c * sizeof(__nv_half));
 
     // Perform layout transform for the outputs
-    launch_transform((__nv_bfloat16*)d_c, (__nv_bfloat16*)d_c_transformed, h_c_shape, h_c_axes_order, 6, false);
+    launch_transform((__nv_half*)d_c, (__nv_half*)d_c_transformed, h_c_shape, h_c_axes_order, 6, false);
 
-    cudaMemcpy(h_c.data(), d_c_transformed, size_c * sizeof(__nv_bfloat16), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_c.data(), d_c_transformed, size_c * sizeof(__nv_half), cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < m; ++i) {
         for (int j = 0; j < n; ++j) {
             float sum = 0.0f;
             for (int kk = 0; kk < k; ++kk) {
-                sum += __bfloat162float(h_a[i * k + kk]) * __bfloat162float(h_b[kk * n + j]);
+                sum += __half2float(h_a[i * k + kk]) * __half2float(h_b[kk * n + j]);
             }
-            h_c_naive[i * n + j] = __float2bfloat16(sum);
+            h_c_naive[i * n + j] = __float2half(sum);
         }
     }
 
     int num_mismatches = 0;
     for (int i = 0; i < size_c; ++i) {
-        float wgmma_val = __bfloat162float(h_c[i]);
-        float naive_val = __bfloat162float(h_c_naive[i]);
+        float wgmma_val = __half2float(h_c[i]);
+        float naive_val = __half2float(h_c_naive[i]);
         if (!is_close(wgmma_val, naive_val)) {
             num_mismatches++;
             if (num_mismatches <= 10) {
@@ -166,7 +166,7 @@ int main() {
     std::cout << "Top-left 4x4 corner of the WGMMA result:" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
-            std::cout << __bfloat162float(h_c[i * n + j]) << " ";
+            std::cout << __half2float(h_c[i * n + j]) << " ";
         }
         std::cout << std::endl;
     }
@@ -174,7 +174,7 @@ int main() {
     std::cout << "Top-left 4x4 corner of the naive result:" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
-            std::cout << __bfloat162float(h_c_naive[i * n + j]) << " ";
+            std::cout << __half2float(h_c_naive[i * n + j]) << " ";
         }
         std::cout << std::endl;
     }
