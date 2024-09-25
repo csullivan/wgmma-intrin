@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++14 -O2 -arch=sm_90a
 INCLUDES = -I.
 
 # Targets
-TARGETS = test_wgmma test_layout_transform_general
+TARGETS = test_wgmma test_layout_transform_general test_wgmma_from_regs
 
 # Header files
 WGMMA_HEADER = wgmma.cuh
@@ -19,6 +19,10 @@ test_wgmma: test_single_instance_wgmma.cu $(WGMMA_HEADER) $(TRANSFORM_HEADER)
 
 # Rule for test_layout_transform_general
 test_layout_transform_general: test_layout_transform_general.cu $(TRANSFORM_HEADER)
+	$(NVCC) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+# Rule for test_wgmma_from_regs
+test_wgmma_from_regs: test_wgmma_from_regs.cu $(WGMMA_HEADER) $(TRANSFORM_HEADER)
 	$(NVCC) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 # Clean up the build files
