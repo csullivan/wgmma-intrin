@@ -13,7 +13,7 @@ __nv_half float_to_f16(float f) {
     return __float2half(f);
 }
 
-bool is_close(float a, float b, float rtol = 1e-5, float atol = 1e-8) {
+bool is_close(float a, float b, float rtol = 1e-3, float atol = 1e-3) {
     return std::fabs(a - b) <= (atol + rtol * std::fabs(b));
 }
 
@@ -27,27 +27,19 @@ int main() {
     std::vector<__nv_half> h_b(size_b);
     std::vector<__nv_half> h_c(size_c);
 
-    // std::random_device rd;
-    // std::mt19937 gen(rd());
-    // std::uniform_real_distribution<> dis(-1.0, 1.0);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
     for (int i = 0; i < m; ++i) {
         for (int j = 0; j < k; ++j) {
-            if (i < 8 && j < 8) {
-                float value = (i * 8 + j); 
-                h_a[i * k + j] = float_to_f16(value);
-            } else {
-                h_a[i * k + j] = float_to_f16(0.0f);
-            }
+            float value = dis(gen);
+            h_a[i * k + j] = float_to_f16(value);
         }
     }
     for (int i = 0; i < k; ++i) {
         for (int j = 0; j < n; ++j) {
-            if (i < 8 && j < 8) {
-                float value = j * 8 + i;
-                h_b[i * n + j] = float_to_f16(value);
-            } else {
-                h_b[i * n + j] = float_to_f16(0.0f);
-            }
+            float value = dis(gen);
+            h_b[i * n + j] = float_to_f16(value);
         }
     }
 
