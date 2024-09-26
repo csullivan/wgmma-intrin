@@ -154,7 +154,6 @@ int main() {
         }
     }
 
-    
     std::cout << "Top-left 4x4 corner of the WGMMA result:" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {

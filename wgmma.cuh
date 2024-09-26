@@ -141,7 +141,7 @@ __device__ uint64_t descriptor(
       ((stride_offset >> 4) << 32) | (base_offset << 49) | (swizzle << 62);
 }
 
-__global__ void wgmma_f16_m64n256k16_kernel(__nv_half* a, __nv_half* b, __nv_half* c) {
+__global__ void wgmma_f16_m64n256k16_kernel_shared_layout(__nv_half* a, __nv_half* b, __nv_half* c) {
   constexpr int a_size = 64 * 16;
   constexpr int b_size = 256 * 16;
   __shared__ __nv_half a_shared[64 * 16];
@@ -184,16 +184,17 @@ __global__ void wgmma_f16_m64n256k16_register_layout_kernel(__nv_half* a, __nv_h
   auto bdim = blockDim.x;
 
   
-  __nv_half a_regs[8];
   __nv_half2 a_regs2[4];
   for (int i = 0; i < 8; ++i) {
     int m_idx = ((i%4)/2 * 8  + (tid/32) * 16 + (tid/4) % 8); // 64
     int k_idx = (i%2 + (i/4)*8 + (tid%4)*2); // 16
-    a_regs[i] = a[m_idx * K + k_idx];
+    if (i % 2 == 0) {
+      a_regs2[i/2].x = a[m_idx * K + k_idx];
+    } else {
+      a_regs2[i/2].y = a[m_idx * K + k_idx];
+    }
   }
-  for (int i = 0; i < 4; ++i) {
-    a_regs2[i] = __halves2half2(a_regs[2*i], a_regs[2*i+1]);
-  }
+
 
   for (int i = tid; i < b_size; i += bdim) {
     b_shared[i] = b[i];
@@ -222,7 +223,7 @@ void wgmma_f16_m64n256k16(void* a, void* b, void* c, int m, int n, int k) {
   
   // TODO(csullivan): Implement outer loops to support larger matrix sizes
 
-  wgmma_f16_m64n256k16_kernel<<<1, 128>>>(
+  wgmma_f16_m64n256k16_kernel_shared_layout<<<1, 128>>>(
       static_cast<__nv_half*>(a),
       static_cast<__nv_half*>(b),
       static_cast<__nv_half*>(c));
