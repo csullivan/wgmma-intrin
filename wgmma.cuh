@@ -5,7 +5,7 @@
 #define __HALF_TO_US(var) *(reinterpret_cast<unsigned short *>(&(var)))
 #define __HALF2_TO_UI(var) *(reinterpret_cast<unsigned int *>(&(var)))
 
-__device__ void ptx_wgmma_f16_m64n256k16(float r[128], uint64_t desc_a, uint64_t desc_b) {
+__device__ void ptx_wgmma_f16_m64n256k16_a_shared(float r[128], uint64_t desc_a, uint64_t desc_b) {
   int scale_d = false;
   int imm_scale_a = 1;
   int imm_scale_b = 1;
@@ -162,7 +162,7 @@ __global__ void wgmma_f16_m64n256k16_kernel(__nv_half* a, __nv_half* b, __nv_hal
   }
 
   float c_regs[128] = {0.0f};
-  ptx_wgmma_f16_m64n256k16(
+  ptx_wgmma_f16_m64n256k16_a_shared(
       c_regs,
       descriptor((uint64_t)a_shared, 128, 256, 0, 0),
       descriptor((uint64_t)b_shared, 128, 128 * 16 / 8, 0, 0));
@@ -178,7 +178,7 @@ __global__ void wgmma_f16_m64n256k16_kernel(__nv_half* a, __nv_half* b, __nv_hal
 __global__ void wgmma_f16_m64n256k16_register_layout_kernel(__nv_half* a, __nv_half* b, __nv_half* c) {
   constexpr int K = 16;
   constexpr int b_size = 256 * 16;
-    __shared__ __nv_half b_shared[256 * 16];
+  __shared__ __nv_half b_shared[256 * 16];
 
   auto tid = threadIdx.x;
   auto bdim = blockDim.x;
