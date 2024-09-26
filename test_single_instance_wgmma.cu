@@ -175,6 +175,27 @@ int main() {
         std::cout << "Total mismatches: " << num_mismatches << " out of " << size_c << " elements" << std::endl;
     }
 
+    const int num_iterations = 100;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+    for (int i = 0; i < num_iterations; ++i) {
+        wgmma_f16_m64n256k16(d_a_transformed, d_b_transformed, d_c, m, n, k);
+    }
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    float avg_runtime = milliseconds / num_iterations;
+    std::cout << "Average runtime over " << num_iterations << " iterations: " << avg_runtime << " ms" << std::endl;
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     cudaFree(d_a);
     cudaFree(d_b);
     cudaFree(d_c);
