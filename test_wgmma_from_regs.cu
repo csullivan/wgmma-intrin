@@ -51,13 +51,8 @@ int main() {
     cudaMemcpy(d_a, h_a.data(), size_a * sizeof(__nv_half), cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, h_b.data(), size_b * sizeof(__nv_half), cudaMemcpyHostToDevice);
 
-    __nv_half *d_a_transformed, *d_b_transformed;
-    cudaMalloc(&d_a_transformed, size_a * sizeof(__nv_half));
+    __nv_half *d_b_transformed;
     cudaMalloc(&d_b_transformed, size_b * sizeof(__nv_half));
-
-    // (m, k) -> (m//8, k//8, m%8, k%8)
-    int32_t h_a_shape[4] = {m / 8, 8, k / 8, 8};
-    int32_t h_a_axes_order[4] = {0, 2, 1, 3};
 
     // (k, n) -> (n//8, k//8, n%8, k%8) 
     int32_t h_b_shape[4] = {k / 8, 8, n / 8, 8};
@@ -77,14 +72,11 @@ int main() {
     int32_t h_c_shape[6] = {4, 8, 4, 32, 2, 2};
     int32_t h_c_axes_order[6] = {0, 4, 1, 3, 2, 5};
 
-    // Perform layout transforms for inputs
-    launch_transform((__nv_half*)d_a, (__nv_half*)d_a_transformed, h_a_shape, h_a_axes_order, 4, true);
+    // Perform layout transform for input B
     launch_transform((__nv_half*)d_b, (__nv_half*)d_b_transformed, h_b_shape, h_b_axes_order, 4, true);
 
-    std::vector<__nv_half> h_a_transformed(size_a);
     std::vector<__nv_half> h_b_transformed(size_b);
 
-    cudaMemcpy(h_a_transformed.data(), d_a_transformed, size_a * sizeof(__nv_half), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_b_transformed.data(), d_b_transformed, size_b * sizeof(__nv_half), cudaMemcpyDeviceToHost);
 
     std::cout << "\nTop right corner of original A (16x16):" << std::endl;    
@@ -94,14 +86,7 @@ int main() {
         }
         std::cout << std::endl;
     }
-    std::cout << "\nTop right corner of transformed A (16x16):" << std::endl;    
-    for (int i = 0; i < 16; ++i) {
-        for (int j = 0; j < 16; ++j) {
-            std::cout << __half2float(h_a_transformed[i * k + j]) << " ";
-        }
-        std::cout << std::endl;
-    }
-
+    
     std::cout << "\nTop right corner of original B (16x16):" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
@@ -121,7 +106,7 @@ int main() {
     __nv_half *d_c_naive;
     cudaMalloc(&d_c_naive, size_c * sizeof(__nv_half));
 
-    wgmma_f16_m64n256k16(d_a_transformed, d_b_transformed, d_c, m, n, k);
+    wgmma_f16_m64n256k16_register_layout_kernel<<<1, 128>>>(d_a, d_b_transformed, d_c);
 
     __nv_half *d_c_transformed;
     cudaMalloc(&d_c_transformed, size_c * sizeof(__nv_half));
@@ -154,6 +139,7 @@ int main() {
         }
     }
 
+    
     std::cout << "Top-left 4x4 corner of the WGMMA result:" << std::endl;
     for (int i = 0; i < 16; ++i) {
         for (int j = 0; j < 16; ++j) {
@@ -175,6 +161,7 @@ int main() {
         std::cout << "Total mismatches: " << num_mismatches << " out of " << size_c << " elements" << std::endl;
     }
 
+
     const int num_iterations = 100;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -182,7 +169,7 @@ int main() {
 
     cudaEventRecord(start);
     for (int i = 0; i < num_iterations; ++i) {
-        wgmma_f16_m64n256k16(d_a_transformed, d_b_transformed, d_c, m, n, k);
+        wgmma_f16_m64n256k16_register_layout_kernel<<<1, 128>>>(d_a, d_b_transformed, d_c);
     }
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -200,7 +187,6 @@ int main() {
     cudaFree(d_b);
     cudaFree(d_c);
     cudaFree(d_c_naive);
-    cudaFree(d_a_transformed);
     cudaFree(d_b_transformed);
     cudaFree(d_c_transformed);
 
